@@ -97,6 +97,7 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
         }
 
         Utils::WriteFile(outputFileName, rgb + sizeof(uint64_t), size);
+        stbi_image_free(rgb);
     }
     catch (std::exception e) {
         stbi_image_free(rgb);
@@ -106,7 +107,5 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
 
 void Utils::XorData(uint8_t* data, uint8_t x, size_t size)
 {
-    for (size_t i = 0; i < size; ++i) {
-        data[i] ^= x;
-    }
+    for (size_t i = 0; i < size; ++i) { data[i] ^= x; }
 }
