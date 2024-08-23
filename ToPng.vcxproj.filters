@@ -50,7 +50,7 @@
     <ClCompile Include="Utils.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="StbImageImpl.cpp">
+    <ClCompile Include="LibImpl.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
