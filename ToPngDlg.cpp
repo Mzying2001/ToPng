@@ -8,20 +8,11 @@
 #include "ToPngDlg.h"
 #include "afxdialogex.h"
 #include "Utils.h"
+#include <thread>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
-
-
-// 读写数据线程参数类型
-struct _CMyThreadParam {
-    CToPngDlg* pWnd;
-    std::string in;
-    std::string out;
-};
-
 
 
 // CToPngDlg 对话框
@@ -302,50 +293,42 @@ BOOL CToPngDlg::ShowSaveFile(CString& refFileName)
 
 void CToPngDlg::Encode(const CString& input, const CString& output)
 {
-    USES_CONVERSION;
-    ::AfxBeginThread([](void* param) -> UINT
-        {
+    std::thread(
+        [=]() {
+            USES_CONVERSION;
+            this->Busy(TRUE);
+
             bool ok = true;
-            auto* p = reinterpret_cast<_CMyThreadParam*>(param);
-            p->pWnd->Busy(TRUE);
-
             try {
-                Utils::WriteFileToPng(p->in, p->out);
+                Utils::WriteFileToPng(T2A(input), T2A(output));
             }
-            catch (std::exception e) {
+            catch (const std::exception& e) {
                 ok = false;
-                p->pWnd->m_strErrMsg = Utils::Utf8ToCString(e.what());
+                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
             }
 
-            p->pWnd->Busy(FALSE);
-            p->pWnd->SendMessage(WM_ENCODEDONE, ok);
-
-            delete p;
-            return 0;
-        }, new _CMyThreadParam({ this, T2A(input), T2A(output) }));
+            this->Busy(FALSE);
+            this->SendMessage(WM_ENCODEDONE, ok);
+        }).detach();
 }
 
 void CToPngDlg::Decode(const CString& input, const CString& output)
 {
-    USES_CONVERSION;
-    ::AfxBeginThread([](void* param) -> UINT
-        {
+    std::thread(
+        [=]() {
+            USES_CONVERSION;
+            this->Busy(TRUE);
+
             bool ok = true;
-            auto* p = reinterpret_cast<_CMyThreadParam*>(param);
-            p->pWnd->Busy(TRUE);
-
             try {
-                Utils::ExtractFileFromPng(p->in, p->out);
+                Utils::ExtractFileFromPng(T2A(input), T2A(output));
             }
-            catch (std::exception e) {
+            catch (const std::exception& e) {
                 ok = false;
-                p->pWnd->m_strErrMsg = Utils::Utf8ToCString(e.what());
+                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
             }
 
-            p->pWnd->Busy(FALSE);
-            p->pWnd->SendMessage(WM_DECODEDONE, ok);
-
-            delete p;
-            return 0;
-        }, new _CMyThreadParam({ this, T2A(input), T2A(output) }));
+            this->Busy(FALSE);
+            this->SendMessage(WM_DECODEDONE, ok);
+        }).detach();
 }
