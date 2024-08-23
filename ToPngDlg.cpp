@@ -16,7 +16,7 @@
 
 
 // 读写数据线程参数类型
-struct _CThreadParam {
+struct _CMyThreadParam {
     CToPngDlg* pWnd;
     std::string in;
     std::string out;
@@ -306,7 +306,7 @@ void CToPngDlg::Encode(const CString& input, const CString& output)
     ::AfxBeginThread([](void* param) -> UINT
         {
             bool ok = true;
-            auto* p = reinterpret_cast<_CThreadParam*>(param);
+            auto* p = reinterpret_cast<_CMyThreadParam*>(param);
             p->pWnd->Busy(TRUE);
 
             try {
@@ -322,7 +322,7 @@ void CToPngDlg::Encode(const CString& input, const CString& output)
 
             delete p;
             return 0;
-        }, new _CThreadParam({ this, T2A(input), T2A(output) }));
+        }, new _CMyThreadParam({ this, T2A(input), T2A(output) }));
 }
 
 void CToPngDlg::Decode(const CString& input, const CString& output)
@@ -331,7 +331,7 @@ void CToPngDlg::Decode(const CString& input, const CString& output)
     ::AfxBeginThread([](void* param) -> UINT
         {
             bool ok = true;
-            auto* p = reinterpret_cast<_CThreadParam*>(param);
+            auto* p = reinterpret_cast<_CMyThreadParam*>(param);
             p->pWnd->Busy(TRUE);
 
             try {
@@ -347,5 +347,5 @@ void CToPngDlg::Decode(const CString& input, const CString& output)
 
             delete p;
             return 0;
-        }, new _CThreadParam({ this, T2A(input), T2A(output) }));
+        }, new _CMyThreadParam({ this, T2A(input), T2A(output) }));
 }
