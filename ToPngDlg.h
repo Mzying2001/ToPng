@@ -15,7 +15,7 @@ class CToPngDlg : public CDialog
 {
     // 构造
 public:
-    CToPngDlg(CWnd* pParent = nullptr);	// 标准构造函数
+    CToPngDlg(CWnd* pParent = nullptr); // 标准构造函数
 
     // 对话框数据
 #ifdef AFX_DESIGN_TIME
@@ -23,7 +23,7 @@ public:
 #endif
 
 protected:
-    virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
+    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 
     // 实现
