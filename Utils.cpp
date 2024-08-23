@@ -8,6 +8,40 @@
 #include "stb/stb_image_write.h"
 
 
+CString Utils::Utf8ToCString(const std::string& str)
+{
+#ifdef UNICODE
+    int utf16Length = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+    if (utf16Length <= 0) {
+        return CString();
+    }
+
+    CString result;
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, result.GetBuffer(utf16Length), utf16Length);
+    result.ReleaseBuffer();
+    return result;
+#else
+    return CString(str.c_str());
+#endif
+}
+
+std::string Utils::CStringToUtf8(const CString& str)
+{
+#ifdef UNICODE
+    int utf8Length = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
+    if (utf8Length <= 0) {
+        return std::string();
+    }
+
+    std::string utf8String(utf8Length, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, str, -1, &utf8String[0], utf8Length, nullptr, nullptr);
+    utf8String.resize(strlen(utf8String.c_str()));
+    return utf8String;
+#else
+    return std::string(CT2A(str));
+#endif
+}
+
 std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
 {
     std::ifstream ifs;

@@ -6,6 +6,12 @@
 
 namespace Utils
 {
+    // 将 UTF-8 std::string 转换为 CString
+    CString Utf8ToCString(const std::string& str);
+
+    // 将 CString 转换为 UTF-8 std::string
+    std::string CStringToUtf8(const CString& str);
+
     // 读文件
     std::vector<uint8_t> ReadFile(const std::string& fileName);
 

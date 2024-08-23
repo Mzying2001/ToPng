@@ -314,7 +314,7 @@ void CToPngDlg::Encode(const CString& input, const CString& output)
             }
             catch (std::exception e) {
                 ok = false;
-                p->pWnd->m_strErrMsg = CString(e.what());
+                p->pWnd->m_strErrMsg = Utils::Utf8ToCString(e.what());
             }
 
             p->pWnd->Busy(FALSE);
@@ -339,7 +339,7 @@ void CToPngDlg::Decode(const CString& input, const CString& output)
             }
             catch (std::exception e) {
                 ok = false;
-                p->pWnd->m_strErrMsg = CString(e.what());
+                p->pWnd->m_strErrMsg = Utils::Utf8ToCString(e.what());
             }
 
             p->pWnd->Busy(FALSE);
