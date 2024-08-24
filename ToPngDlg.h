@@ -53,6 +53,7 @@ public:
     afx_msg void OnEncode();
     afx_msg void OnDecode();
     afx_msg void OnExit();
+    afx_msg void OnEncodeDir();
 
 public:
     // 更新布局
@@ -79,9 +80,15 @@ public:
     // 显示保存文件对话框
     BOOL ShowSaveFile(CString& refFileName);
 
+    // 显示打开文件夹对话框
+    BOOL ShowOpenDirectory(CString& refDirectory);
+
     // 编码
     void Encode(const CString& input, const CString& output);
 
     // 解码
     void Decode(const CString& input, const CString& output);
+
+    // 打包文件夹并编码（zip）
+    void EncodeDir(const CString& input, const CString& output);
 };

@@ -43,6 +43,7 @@ BEGIN_MESSAGE_MAP(CToPngDlg, CDialog)
     ON_COMMAND(ID_ENCODE, &CToPngDlg::OnEncode)
     ON_COMMAND(ID_DECODE, &CToPngDlg::OnDecode)
     ON_COMMAND(ID_EXIT, &CToPngDlg::OnExit)
+    ON_COMMAND(ID_ENCODEDIR, &CToPngDlg::OnEncodeDir)
     ON_MESSAGE(WM_BUSYCNANGED, &CToPngDlg::OnBusyChanged)
     ON_MESSAGE(WM_ENCODEDONE, &CToPngDlg::OnEncodeDone)
     ON_MESSAGE(WM_DECODEDONE, &CToPngDlg::OnDecodeDone)
@@ -149,7 +150,12 @@ void CToPngDlg::OnDropFiles(HDROP hDropInfo)
     }
 
     CString out;
-    if (CString(buf).MakeUpper().Right(4) == _T(".PNG")) {
+    if (::GetFileAttributes(buf) & FILE_ATTRIBUTE_DIRECTORY) {
+        if (this->ShowSavePngFile(out)) {
+            this->EncodeDir(buf, out);
+        }
+    }
+    else if (CString(buf).MakeUpper().Right(4) == _T(".PNG")) {
         if (this->ShowSaveFile(out)) {
             this->Decode(buf, out);
         }
@@ -180,6 +186,14 @@ void CToPngDlg::OnDecode()
 void CToPngDlg::OnExit()
 {
     this->SendMessage(WM_CLOSE);
+}
+
+void CToPngDlg::OnEncodeDir()
+{
+    CString input, output;
+    if (ShowOpenDirectory(input) && ShowSavePngFile(output)) {
+        this->EncodeDir(input, output);
+    }
 }
 
 void CToPngDlg::UpdateLayout()
@@ -291,6 +305,17 @@ BOOL CToPngDlg::ShowSaveFile(CString& refFileName)
     return FALSE;
 }
 
+BOOL CToPngDlg::ShowOpenDirectory(CString& refDirectory)
+{
+    CFolderPickerDialog dlg;
+
+    if (dlg.DoModal() == IDOK) {
+        refDirectory = dlg.GetFolderPath();
+        return TRUE;
+    }
+    return FALSE;
+}
+
 void CToPngDlg::Encode(const CString& input, const CString& output)
 {
     std::thread(
@@ -330,5 +355,26 @@ void CToPngDlg::Decode(const CString& input, const CString& output)
 
             this->Busy(FALSE);
             this->SendMessage(WM_DECODEDONE, ok);
+        }).detach();
+}
+
+void CToPngDlg::EncodeDir(const CString& input, const CString& output)
+{
+    std::thread(
+        [=]() {
+            USES_CONVERSION;
+            this->Busy(TRUE);
+
+            bool ok = true;
+            try {
+                Utils::ArchiveDirectoryToPng(T2A(input), T2A(output));
+            }
+            catch (const std::exception& e) {
+                ok = false;
+                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
+            }
+
+            this->Busy(FALSE);
+            this->SendMessage(WM_ENCODEDONE, ok);
         }).detach();
 }
