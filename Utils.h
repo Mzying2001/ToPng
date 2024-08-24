@@ -26,4 +26,7 @@ namespace Utils
 
     // 对数据进行异或运算
     void XorData(uint8_t* data, uint8_t x, size_t size);
+
+    // 打包文件夹（zip）
+    std::vector<uint8_t> ArchiveDirectory(const std::string& dir);
 }

@@ -4,9 +4,55 @@
 #include <fstream>
 #include <random>
 
+#include "miniz/miniz.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
+
+static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath) {
+    std::vector<uint8_t> fileData = Utils::ReadFile(filePath);
+    if (!mz_zip_writer_add_mem(&zip, relativePath.c_str(), fileData.data(), fileData.size(), MZ_BEST_COMPRESSION)) {
+        throw std::runtime_error("添加文件到ZIP失败：" + relativePath);
+    }
+}
+
+static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, const std::string& basePath) {
+    WIN32_FIND_DATAA findData;
+    std::string searchPath = dirPath + "\\*";
+
+    HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("打开目录失败：" + dirPath);
+    }
+
+    try {
+        do {
+            std::string fileName = findData.cFileName;
+
+            if (fileName == "." || fileName == "..") {
+                continue;
+            }
+
+            std::string fullPath = dirPath + "\\" + fileName;
+            std::string relativePath = basePath.empty() ? fileName : basePath + "\\" + fileName;
+
+            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                // 递归处理子目录
+                _CompressDirectory(zip, fullPath, relativePath);
+            }
+            else {
+                // 添加文件到 ZIP
+                _AddFileToZip(zip, fullPath, relativePath);
+            }
+        } while (FindNextFileA(hFind, &findData));
+    }
+    catch (const std::runtime_error&) {
+        FindClose(hFind);
+        throw;
+    }
+
+    FindClose(hFind);
+}
 
 CString Utils::Utf8ToCString(const std::string& str)
 {
@@ -31,7 +77,7 @@ std::string Utils::CStringToUtf8(const CString& str)
     int utf8Length = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
     if (utf8Length <= 0) {
         return std::string();
-    }
+}
 
     std::string utf8String(utf8Length, '\0');
     WideCharToMultiByte(CP_UTF8, 0, str, -1, &utf8String[0], utf8Length, nullptr, nullptr);
@@ -142,4 +188,35 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
 void Utils::XorData(uint8_t* data, uint8_t x, size_t size)
 {
     for (size_t i = 0; i < size; ++i) { data[i] ^= x; }
+}
+
+std::vector<uint8_t> Utils::ArchiveDirectory(const std::string& dir)
+{
+    mz_zip_archive zip;
+    memset(&zip, 0, sizeof(zip));
+    if (!mz_zip_writer_init_heap(&zip, 0, 0)) {
+        throw std::runtime_error("初始化ZIP压缩失败");
+    }
+
+    try {
+        // 压缩目录
+        _CompressDirectory(zip, dir, "");
+
+        // 获取压缩后的数据
+        size_t zipSize = 0;
+        void* pZipData = nullptr;
+        if (!mz_zip_writer_finalize_heap_archive(&zip, &pZipData, &zipSize)) {
+            throw std::runtime_error("最终化ZIP压缩失败");
+        }
+
+        // 将数据复制到 vector 并释放内存
+        std::vector<uint8_t> zipData((uint8_t*)pZipData, (uint8_t*)pZipData + zipSize);
+        mz_free(pZipData);
+
+        return zipData;
+    }
+    catch (const std::runtime_error&) {
+        mz_zip_writer_end(&zip);
+        throw;
+    }
 }
