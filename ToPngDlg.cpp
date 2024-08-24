@@ -220,6 +220,7 @@ void CToPngDlg::UpdateEnables()
     CMenu* menu = this->GetMenu();
     menu->EnableMenuItem(ID_ENCODE, this->m_bBusy);
     menu->EnableMenuItem(ID_DECODE, this->m_bBusy);
+    menu->EnableMenuItem(ID_ENCODEDIR, this->m_bBusy);
 }
 
 void CToPngDlg::Busy(BOOL b)
