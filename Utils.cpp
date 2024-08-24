@@ -235,3 +235,10 @@ std::vector<uint8_t> Utils::ArchiveDirectory(const std::string& dir)
         throw;
     }
 }
+
+// 用zip打包文件夹并写入png图像
+void Utils::ArchiveDirectoryToPng(const std::string& dir, const std::string& pngFileName)
+{
+    std::vector<uint8_t> data = Utils::ArchiveDirectory(dir);
+    _WriteDataToPng(data, pngFileName);
+}

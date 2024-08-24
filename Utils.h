@@ -29,4 +29,7 @@ namespace Utils
 
     // 打包文件夹（zip）
     std::vector<uint8_t> ArchiveDirectory(const std::string& dir);
+
+    // 用zip打包文件夹并写入png图像
+    void ArchiveDirectoryToPng(const std::string& dir, const std::string& pngFileName);
 }
