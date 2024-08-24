@@ -9,6 +9,7 @@
 #include "stb/stb_image_write.h"
 
 
+// 添加文件到zip
 static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath) {
     std::vector<uint8_t> fileData = Utils::ReadFile(filePath);
     if (!mz_zip_writer_add_mem(&zip, relativePath.c_str(), fileData.data(), fileData.size(), MZ_BEST_COMPRESSION)) {
@@ -16,6 +17,7 @@ static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, cons
     }
 }
 
+// 压缩文件夹
 static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, const std::string& basePath) {
     WIN32_FIND_DATAA findData;
     std::string searchPath = dirPath + "\\*";
@@ -54,6 +56,7 @@ static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, 
     FindClose(hFind);
 }
 
+// 将 UTF-8 std::string 转换为 CString
 CString Utils::Utf8ToCString(const std::string& str)
 {
 #ifdef UNICODE
@@ -71,13 +74,14 @@ CString Utils::Utf8ToCString(const std::string& str)
 #endif
 }
 
+// 将 CString 转换为 UTF-8 std::string
 std::string Utils::CStringToUtf8(const CString& str)
 {
 #ifdef UNICODE
     int utf8Length = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
     if (utf8Length <= 0) {
         return std::string();
-}
+    }
 
     std::string utf8String(utf8Length, '\0');
     WideCharToMultiByte(CP_UTF8, 0, str, -1, &utf8String[0], utf8Length, nullptr, nullptr);
@@ -88,6 +92,7 @@ std::string Utils::CStringToUtf8(const CString& str)
 #endif
 }
 
+// 读文件
 std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
 {
     std::ifstream ifs;
@@ -113,6 +118,7 @@ std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
     return data;
 }
 
+// 写文件
 void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 {
     if (data == nullptr) {
@@ -134,6 +140,7 @@ void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
     ofs.close();
 }
 
+// 写入文件到png图像
 void Utils::WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName)
 {
     std::vector<uint8_t> data = Utils::ReadFile(inputFileName);
@@ -159,6 +166,7 @@ void Utils::WriteFileToPng(const std::string& inputFileName, const std::string& 
     }
 }
 
+// 从png图像中提取文件
 void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string& outputFileName)
 {
     int w, h, channels;
@@ -185,11 +193,13 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
     }
 }
 
+// 对数据进行异或运算
 void Utils::XorData(uint8_t* data, uint8_t x, size_t size)
 {
     for (size_t i = 0; i < size; ++i) { data[i] ^= x; }
 }
 
+// 打包文件夹（zip）
 std::vector<uint8_t> Utils::ArchiveDirectory(const std::string& dir)
 {
     mz_zip_archive zip;
