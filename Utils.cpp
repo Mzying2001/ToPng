@@ -48,7 +48,7 @@ std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
     ifs.open(fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
     if (!ifs.is_open()) {
-        throw std::exception("打开文件失败");
+        throw std::runtime_error("打开文件失败");
     }
 
     ifs.seekg(0, std::ios::end);
@@ -56,7 +56,7 @@ std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
     ifs.seekg(0, std::ios::beg);
 
     if (size == 0) {
-        throw std::exception("文件内容不能为空");
+        throw std::runtime_error("文件内容不能为空");
     }
 
     std::vector<uint8_t> data;
@@ -70,18 +70,18 @@ std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
 void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 {
     if (data == nullptr) {
-        throw std::exception("参数data不能为nullptr");
+        throw std::runtime_error("参数data不能为nullptr");
     }
 
     if (size == 0) {
-        throw std::exception("写入数据的大小不能为0");
+        throw std::runtime_error("写入数据的大小不能为0");
     }
 
     std::ofstream ofs;
     ofs.open(fileName.c_str(), std::ios_base::out | std::ios_base::binary);
 
     if (!ofs.is_open()) {
-        throw std::exception("无法打开要写入的文件");
+        throw std::runtime_error("无法打开要写入的文件");
     }
 
     ofs.write(reinterpret_cast<char*>(data), size);
@@ -109,7 +109,7 @@ void Utils::WriteFileToPng(const std::string& inputFileName, const std::string& 
     Utils::XorData(&data[0], 0xaa, data.size());
     int ok = stbi_write_png(pngFileName.c_str(), width, width, 3, &data[0], width * 3);
     if (ok == 0) {
-        throw std::exception("写入png文件失败");
+        throw std::runtime_error("写入png文件失败");
     }
 }
 
@@ -119,7 +119,7 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
     uint8_t* rgb = stbi_load(pngFileName.c_str(), &w, &h, &channels, 3);
 
     if (rgb == nullptr) {
-        throw std::exception("打开png文件失败");
+        throw std::runtime_error("打开png文件失败");
     }
 
     try {
@@ -127,15 +127,15 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
         uint64_t size = *reinterpret_cast<uint64_t*>(rgb);
 
         if (size + sizeof(uint64_t) > static_cast<size_t>(w) * h * 3) {
-            throw std::exception("数据格式错误");
+            throw std::runtime_error("数据格式错误");
         }
 
         Utils::WriteFile(outputFileName, rgb + sizeof(uint64_t), size);
         stbi_image_free(rgb);
     }
-    catch (std::exception e) {
+    catch (const std::runtime_error&) {
         stbi_image_free(rgb);
-        throw e;
+        throw;
     }
 }
 
