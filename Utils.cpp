@@ -56,6 +56,30 @@ static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, 
     FindClose(hFind);
 }
 
+// 写数据到png图像，该函数会改变data的内容
+static void _WriteDataToPng(std::vector<uint8_t>& data, const std::string& pngFileName)
+{
+    size_t size = data.size();
+    data.insert(data.begin(), sizeof(uint64_t), 0);
+    *reinterpret_cast<uint64_t*>(&data[0]) = size;
+    size += sizeof(uint64_t);
+
+    int width = static_cast<int>(std::ceil(std::sqrt(size / 3.0)));
+    data.resize(static_cast<size_t>(width) * width * 3);
+
+    std::default_random_engine e(static_cast<unsigned int>(time(nullptr)));
+    std::uniform_int_distribution<int> u(0, (std::numeric_limits<uint8_t>::max)());
+    for (size_t i = size; i < data.size(); ++i) {
+        data[i] = u(e);
+    }
+
+    Utils::XorData(&data[0], 0xaa, data.size());
+    int ok = stbi_write_png(pngFileName.c_str(), width, width, 3, &data[0], width * 3);
+    if (ok == 0) {
+        throw std::runtime_error("写入png文件失败");
+    }
+}
+
 // 将 UTF-8 std::string 转换为 CString
 CString Utils::Utf8ToCString(const std::string& str)
 {
@@ -144,26 +168,7 @@ void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 void Utils::WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName)
 {
     std::vector<uint8_t> data = Utils::ReadFile(inputFileName);
-
-    size_t size = data.size();
-    data.insert(data.begin(), sizeof(uint64_t), 0);
-    *reinterpret_cast<uint64_t*>(&data[0]) = size;
-    size += sizeof(uint64_t);
-
-    int width = static_cast<int>(std::ceil(std::sqrt(size / 3.0)));
-    data.resize(static_cast<size_t>(width) * width * 3);
-
-    std::default_random_engine e(static_cast<unsigned int>(time(nullptr)));
-    std::uniform_int_distribution<int> u(0, (std::numeric_limits<uint8_t>::max)());
-    for (size_t i = size; i < data.size(); ++i) {
-        data[i] = u(e);
-    }
-
-    Utils::XorData(&data[0], 0xaa, data.size());
-    int ok = stbi_write_png(pngFileName.c_str(), width, width, 3, &data[0], width * 3);
-    if (ok == 0) {
-        throw std::runtime_error("写入png文件失败");
-    }
+    _WriteDataToPng(data, pngFileName);
 }
 
 // 从png图像中提取文件
