@@ -9,10 +9,10 @@
 namespace MyUtils
 {
     // 读文件
-    std::vector<uint8_t> ReadFile(const std::string& fileName);
+    std::vector<uint8_t> ReadFile(const std::string& fileName, bool allowEmpty = true);
 
     // 写文件
-    void WriteFile(const std::string& fileName, uint8_t* data, size_t size);
+    void WriteFile(const std::string& fileName, uint8_t* data, size_t size, bool allowEmpty = true);
 
     // 写入文件到png图像
     void WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName);

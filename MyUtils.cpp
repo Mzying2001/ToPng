@@ -10,7 +10,8 @@
 
 
 // 添加文件到zip
-static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath) {
+static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath)
+{
     std::vector<uint8_t> fileData = MyUtils::ReadFile(filePath);
     if (!mz_zip_writer_add_mem(&zip, relativePath.c_str(), fileData.data(), fileData.size(), MZ_BEST_COMPRESSION)) {
         throw std::runtime_error("添加文件到ZIP失败：" + relativePath);
@@ -18,7 +19,8 @@ static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, cons
 }
 
 // 压缩文件夹
-static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, const std::string& basePath) {
+static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, const std::string& basePath)
+{
     WIN32_FIND_DATAA findData;
     std::string searchPath = dirPath + "\\*";
 
@@ -81,39 +83,41 @@ static void _WriteDataToPng(std::vector<uint8_t>& data, const std::string& pngFi
 }
 
 // 读文件
-std::vector<uint8_t> MyUtils::ReadFile(const std::string& fileName)
+std::vector<uint8_t> MyUtils::ReadFile(const std::string& fileName, bool allowEmpty)
 {
     std::ifstream ifs;
     ifs.open(fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
     if (!ifs.is_open()) {
-        throw std::runtime_error("打开文件失败");
+        throw std::runtime_error("打开文件失败：" + fileName);
     }
 
     ifs.seekg(0, std::ios::end);
     size_t size = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    if (size == 0) {
-        throw std::runtime_error("文件内容不能为空");
+    if (size == 0 && !allowEmpty) {
+        throw std::runtime_error("文件内容不能为空：" + fileName);
     }
 
     std::vector<uint8_t> data;
-    data.resize(size);
-    ifs.read(reinterpret_cast<char*>(&data[0]), size);
+    if (size > 0) {
+        data.resize(size);
+        ifs.read(reinterpret_cast<char*>(&data[0]), size);
+    }
 
     ifs.close();
     return data;
 }
 
 // 写文件
-void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
+void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size, bool allowEmpty)
 {
     if (data == nullptr) {
         throw std::runtime_error("参数data不能为nullptr");
     }
 
-    if (size == 0) {
+    if (size == 0 && !allowEmpty) {
         throw std::runtime_error("写入数据的大小不能为0");
     }
 
@@ -121,7 +125,7 @@ void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
     ofs.open(fileName.c_str(), std::ios_base::out | std::ios_base::binary);
 
     if (!ofs.is_open()) {
-        throw std::runtime_error("无法打开要写入的文件");
+        throw std::runtime_error("无法打开要写入的文件：" + fileName);
     }
 
     ofs.write(reinterpret_cast<char*>(data), size);
@@ -131,7 +135,7 @@ void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 // 写入文件到png图像
 void MyUtils::WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName)
 {
-    std::vector<uint8_t> data = MyUtils::ReadFile(inputFileName);
+    std::vector<uint8_t> data = MyUtils::ReadFile(inputFileName, false);
     _WriteDataToPng(data, pngFileName);
 }
 
@@ -142,7 +146,7 @@ void MyUtils::ExtractFileFromPng(const std::string& pngFileName, const std::stri
     uint8_t* rgb = stbi_load(pngFileName.c_str(), &w, &h, &channels, 3);
 
     if (rgb == nullptr) {
-        throw std::runtime_error("打开png文件失败");
+        throw std::runtime_error("打开png文件失败：" + pngFileName);
     }
 
     try {
