@@ -7,14 +7,21 @@
 #include "miniz.h"
 #include "stb_image.h"
 #include "stb_image_write.h"
+#include "SimpleWindow.h"
 
+
+// 转换字符串编码为utf8
+static std::string _ToUtf8(const std::string& str)
+{
+    return sw::Utils::ToMultiByteStr(sw::Utils::ToWideStr(str), true);
+}
 
 // 添加文件到zip
 static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath)
 {
     std::vector<uint8_t> fileData = MyUtils::ReadFile(filePath);
     if (!mz_zip_writer_add_mem(&zip, relativePath.c_str(), fileData.data(), fileData.size(), MZ_BEST_COMPRESSION)) {
-        throw std::runtime_error("添加文件到ZIP失败：" + relativePath);
+        throw std::runtime_error("添加文件到ZIP失败：" + _ToUtf8(relativePath));
     }
 }
 
@@ -26,7 +33,7 @@ static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, 
 
     HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
     if (hFind == INVALID_HANDLE_VALUE) {
-        throw std::runtime_error("打开目录失败：" + dirPath);
+        throw std::runtime_error("打开目录失败：" + _ToUtf8(dirPath));
     }
 
     try {
@@ -38,7 +45,7 @@ static void _CompressDirectory(mz_zip_archive& zip, const std::string& dirPath, 
             }
 
             std::string fullPath = dirPath + "\\" + fileName;
-            std::string relativePath = basePath.empty() ? fileName : basePath + "\\" + fileName;
+            std::string relativePath = basePath.empty() ? fileName : (basePath + "\\" + fileName);
 
             if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                 // 递归处理子目录
@@ -89,7 +96,7 @@ std::vector<uint8_t> MyUtils::ReadFile(const std::string& fileName, bool allowEm
     ifs.open(fileName.c_str(), std::ios_base::in | std::ios_base::binary);
 
     if (!ifs.is_open()) {
-        throw std::runtime_error("打开文件失败：" + fileName);
+        throw std::runtime_error("打开文件失败：" + _ToUtf8(fileName));
     }
 
     ifs.seekg(0, std::ios::end);
@@ -97,7 +104,7 @@ std::vector<uint8_t> MyUtils::ReadFile(const std::string& fileName, bool allowEm
     ifs.seekg(0, std::ios::beg);
 
     if (size == 0 && !allowEmpty) {
-        throw std::runtime_error("文件内容不能为空：" + fileName);
+        throw std::runtime_error("文件内容不能为空：" + _ToUtf8(fileName));
     }
 
     std::vector<uint8_t> data;
@@ -125,7 +132,7 @@ void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size,
     ofs.open(fileName.c_str(), std::ios_base::out | std::ios_base::binary);
 
     if (!ofs.is_open()) {
-        throw std::runtime_error("无法打开要写入的文件：" + fileName);
+        throw std::runtime_error("无法打开要写入的文件：" + _ToUtf8(fileName));
     }
 
     ofs.write(reinterpret_cast<char*>(data), size);
@@ -146,7 +153,7 @@ void MyUtils::ExtractFileFromPng(const std::string& pngFileName, const std::stri
     uint8_t* rgb = stbi_load(pngFileName.c_str(), &w, &h, &channels, 3);
 
     if (rgb == nullptr) {
-        throw std::runtime_error("打开png文件失败：" + pngFileName);
+        throw std::runtime_error("打开png文件失败：" + _ToUtf8(pngFileName));
     }
 
     try {
