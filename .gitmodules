@@ -1,3 +1,6 @@
 [submodule "sw"]
 	path = sw
 	url = https://github.com/Mzying2001/sw.git
+[submodule "stb"]
+	path = stb
+	url = https://github.com/nothings/stb.git
