@@ -1,381 +1,323 @@
-﻿
-// ToPngDlg.cpp: 实现文件
-//
-
-#include "pch.h"
-#include "framework.h"
-#include "ToPng.h"
 #include "ToPngDlg.h"
-#include "afxdialogex.h"
-#include "Utils.h"
+#include "MyUtils.h"
 #include <thread>
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
-
-// CToPngDlg 对话框
-
-
-
-CToPngDlg::CToPngDlg(CWnd* pParent /*=nullptr*/)
-    : CDialog(IDD_TOPNG_DIALOG, pParent)
-    , m_strStatus(_T(""))
+ToPngDlg::ToPngDlg()
 {
-    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-    m_bBusy = FALSE;
+    Menu = &menu;
+    Width = 500;
+    Height = 350;
+    Text = L"ToPng";
+    MaximizeBox = false;
+    BackColor = sw::KnownColor::Control;
+    StartupLocation = sw::WindowStartupLocation::CenterScreen;
+    SetLayout<sw::FillLayout>();
+    InitializeComponent();
+
+    AcceptFiles = true;
+    RegisterRoutedEvent<sw::DropFilesEventArgs>(*this, &ToPngDlg::DropFilesHandler);
+    RegisterRoutedEvent<sw::WindowClosingEventArgs>(*this, &ToPngDlg::WindowClosingHandler);
 }
 
-void CToPngDlg::DoDataExchange(CDataExchange* pDX)
+void ToPngDlg::InitializeComponent()
 {
-    CDialog::DoDataExchange(pDX);
-    DDX_Control(pDX, IDC_STATIC_STATUS, m_textCtrlStatus);
-    DDX_Text(pDX, IDC_STATIC_STATUS, m_strStatus);
+    labelStatus.AutoWrap = true;
+    labelStatus.HorizontalContentAlignment = sw::HorizontalAlignment::Center;
+    labelStatus.SetAlignment(sw::HorizontalAlignment::Center, sw::VerticalAlignment::Center);
+    UpdateStatusText();
+    AddChild(labelStatus);
 }
 
-BEGIN_MESSAGE_MAP(CToPngDlg, CDialog)
-    ON_WM_PAINT()
-    ON_WM_QUERYDRAGICON()
-    ON_WM_CLOSE()
-    ON_WM_SIZE()
-    ON_WM_DROPFILES()
-    ON_COMMAND(ID_ENCODE, &CToPngDlg::OnEncode)
-    ON_COMMAND(ID_DECODE, &CToPngDlg::OnDecode)
-    ON_COMMAND(ID_EXIT, &CToPngDlg::OnExit)
-    ON_COMMAND(ID_ENCODEDIR, &CToPngDlg::OnEncodeDir)
-    ON_MESSAGE(WM_BUSYCNANGED, &CToPngDlg::OnBusyChanged)
-    ON_MESSAGE(WM_ENCODEDONE, &CToPngDlg::OnEncodeDone)
-    ON_MESSAGE(WM_DECODEDONE, &CToPngDlg::OnDecodeDone)
-END_MESSAGE_MAP()
-
-
-// CToPngDlg 消息处理程序
-
-BOOL CToPngDlg::OnInitDialog()
+LRESULT ToPngDlg::WndProc(const sw::ProcMsg& refMsg)
 {
-    CDialog::OnInitDialog();
-
-    // 设置此对话框的图标。  当应用程序主窗口不是对话框时，框架将自动
-    //  执行此操作
-    SetIcon(m_hIcon, TRUE);         // 设置大图标
-    SetIcon(m_hIcon, FALSE);        // 设置小图标
-
-    // TODO: 在此添加额外的初始化代码
-    this->UpdateLayout();
-    this->Busy(FALSE);
-
-    return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
-}
-
-// 如果向对话框添加最小化按钮，则需要下面的代码
-//  来绘制该图标。  对于使用文档/视图模型的 MFC 应用程序，
-//  这将由框架自动完成。
-
-void CToPngDlg::OnPaint()
-{
-    if (IsIconic())
+    switch (refMsg.uMsg)
     {
-        CPaintDC dc(this); // 用于绘制的设备上下文
-
-        SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
-
-        // 使图标在工作区矩形中居中
-        int cxIcon = GetSystemMetrics(SM_CXICON);
-        int cyIcon = GetSystemMetrics(SM_CYICON);
-        CRect rect;
-        GetClientRect(&rect);
-        int x = (rect.Width() - cxIcon + 1) / 2;
-        int y = (rect.Height() - cyIcon + 1) / 2;
-
-        // 绘制图标
-        dc.DrawIcon(x, y, m_hIcon);
+    case WM_ENCODEDONE: {
+        OnEncodeDone(refMsg.wParam);
+        return 0;
     }
-    else
+    case WM_DECODEDONE: {
+        OnDecodeDone(refMsg.wParam);
+        return 0;
+    }
+    case WM_ISLOADINGCHANGED: {
+        UpdateStatusText();
+        UpdateEnables();
+        return 0;
+    }
+    default: {
+        return sw::Window::WndProc(refMsg);
+    }
+    }
+}
+
+void ToPngDlg::WindowClosingHandler(sw::UIElement& sender, sw::WindowClosingEventArgs& e)
+{
+    if (isLoading) {
+        e.cancel = true;
+        sw::MsgBox::ShowInfo(L"程序正忙...", L"提示");
+    }
+}
+
+void ToPngDlg::DropFilesHandler(sw::UIElement& sender, sw::DropFilesEventArgs& e)
+{
+    HDROP hDropInfo = e.hDrop;
+
+    if (isLoading) {
+        return;
+    }
+
+    if (DragQueryFileW(hDropInfo, -1, NULL, 0) != 1) {
+        sw::MsgBox::ShowInfo(L"仅支持拖入一个文件", L"提示");
+        return;
+    }
+
+    wchar_t buf[MAX_PATH];
+    if (!DragQueryFileW(hDropInfo, 0, buf, MAX_PATH)) {
+        sw::MsgBox::ShowError(L"获取拖入文件路径失败", L"错误");
+        return;
+    }
+
+    std::wstring out;
+    if (GetFileAttributesW(buf) & FILE_ATTRIBUTE_DIRECTORY) {
+        if (ShowSavePngFile(out)) {
+            EncodeDir(buf, out);
+        }
+    }
+    else if (StrEndsWithIgnoreCase(buf, L".PNG")) {
+        if (ShowSaveFile(out)) {
+            Decode(buf, out);
+        }
+    }
+    else {
+        if (ShowSavePngFile(out)) {
+            Encode(buf, out);
+        }
+    }
+}
+
+void ToPngDlg::MenuCommandHandler(sw::MenuItem& menuItem)
+{
+    switch (menuItem.tag)
     {
-        CDialog::OnPaint();
+    case MENUITEM_ENCODE: {
+        std::wstring input, output;
+        if (ShowOpenFile(input) && ShowSavePngFile(output)) {
+            Encode(input, output);
+        }
+        break;
+    }
+    case MENUITEM_DECODE: {
+        std::wstring input, output;
+        if (ShowOpenPngFile(input) && ShowSaveFile(output)) {
+            Decode(input, output);
+        }
+        break;
+    }
+    case MENUITEM_ENCODEDIR: {
+        std::wstring input, output;
+        if (ShowOpenDirectory(input) && ShowSavePngFile(output)) {
+            EncodeDir(input, output);
+        }
+        break;
+    }
+    case MENUITEM_EXIT: {
+        Close();
+        break;
+    }
     }
 }
 
-//当用户拖动最小化窗口时系统调用此函数取得光标
-//显示。
-HCURSOR CToPngDlg::OnQueryDragIcon()
+void ToPngDlg::UpdateStatusText()
 {
-    return static_cast<HCURSOR>(m_hIcon);
+    labelStatus.Text = isLoading
+        ? L"加载中..."
+        : L"拖动文件到窗口以进行编码/解码";
 }
 
-
-
-void CToPngDlg::OnOK()
+void ToPngDlg::UpdateEnables()
 {
+    menu.SetEnabled(*menu.GetMenuItemByTag(MENUITEM_ENCODE), !isLoading);
+    menu.SetEnabled(*menu.GetMenuItemByTag(MENUITEM_DECODE), !isLoading);
+    menu.SetEnabled(*menu.GetMenuItemByTag(MENUITEM_ENCODEDIR), !isLoading);
 }
 
-void CToPngDlg::OnCancel()
+void ToPngDlg::SetLoadingState(bool isLoading)
 {
-    this->SendMessage(WM_CLOSE);
+    this->isLoading = isLoading;
+    SendMessageW(WM_ISLOADINGCHANGED, 0, 0);
 }
 
-void CToPngDlg::OnClose()
+void ToPngDlg::OnEncodeDone(bool success)
 {
-    if (this->m_bBusy) {
-        ::AfxMessageBox(_T("程序正忙..."), MB_OK | MB_ICONINFORMATION);
+    if (success) {
+        sw::MsgBox::ShowInfo(L"编码完成", L"提示");
     }
     else {
-        CDialog::OnClose();
-        CDialog::OnCancel();
+        sw::MsgBox::ShowError(errMsg, L"错误");
     }
 }
 
-void CToPngDlg::OnSize(UINT nType, int cx, int cy)
+void ToPngDlg::OnDecodeDone(bool success)
 {
-    CDialog::OnSize(nType, cx, cy);
-    this->UpdateLayout();
+    if (success) {
+        sw::MsgBox::ShowInfo(L"解码完成", L"提示");
+    }
+    else {
+        sw::MsgBox::ShowError(errMsg, L"错误");
+    }
 }
 
-void CToPngDlg::OnDropFiles(HDROP hDropInfo)
+void ToPngDlg::Encode(const std::wstring& input, const std::wstring& output)
 {
-    if (this->m_bBusy) {
+    if (isLoading) {
         return;
     }
 
-    if (DragQueryFile(hDropInfo, -1, NULL, 0) != 1) {
-        ::AfxMessageBox(_T("仅支持拖入一个文件"), MB_OK | MB_ICONINFORMATION);
+    std::thread(
+        [=]() {
+            SetLoadingState(true);
+
+            bool ok = true;
+            try {
+                MyUtils::WriteFileToPng(
+                    sw::Utils::ToMultiByteStr(input),
+                    sw::Utils::ToMultiByteStr(output));
+            }
+            catch (const std::exception& e) {
+                ok = false;
+                errMsg = sw::Utils::ToWideStr(e.what(), true);
+            }
+
+            SetLoadingState(false);
+            SendMessageW(WM_ENCODEDONE, ok, 0);
+        }).detach();
+}
+
+void ToPngDlg::Decode(const std::wstring& input, const std::wstring& output)
+{
+    if (isLoading) {
         return;
     }
 
-    TCHAR buf[MAX_PATH];
-    if (!DragQueryFile(hDropInfo, 0, buf, MAX_PATH)) {
-        ::AfxMessageBox(_T("获取拖入文件路径失败"), MB_OK | MB_ICONERROR);
+    std::thread(
+        [=]() {
+            SetLoadingState(true);
+
+            bool ok = true;
+            try {
+                MyUtils::ExtractFileFromPng(
+                    sw::Utils::ToMultiByteStr(input),
+                    sw::Utils::ToMultiByteStr(output));
+            }
+            catch (const std::exception& e) {
+                ok = false;
+                errMsg = sw::Utils::ToWideStr(e.what(), true);
+            }
+
+            SetLoadingState(false);
+            SendMessageW(WM_DECODEDONE, ok, 0);
+        }).detach();
+}
+
+void ToPngDlg::EncodeDir(const std::wstring& input, const std::wstring& output)
+{
+    if (isLoading) {
         return;
     }
 
-    CString out;
-    if (::GetFileAttributes(buf) & FILE_ATTRIBUTE_DIRECTORY) {
-        if (this->ShowSavePngFile(out)) {
-            this->EncodeDir(buf, out);
-        }
-    }
-    else if (CString(buf).MakeUpper().Right(4) == _T(".PNG")) {
-        if (this->ShowSaveFile(out)) {
-            this->Decode(buf, out);
-        }
-    }
-    else {
-        if (this->ShowSavePngFile(out)) {
-            this->Encode(buf, out);
-        }
-    }
-}
-
-void CToPngDlg::OnEncode()
-{
-    CString input, output;
-    if (ShowOpenFile(input) && ShowSavePngFile(output)) {
-        this->Encode(input, output);
-    }
-}
-
-void CToPngDlg::OnDecode()
-{
-    CString input, output;
-    if (ShowOpenPngFile(input) && ShowSaveFile(output)) {
-        this->Decode(input, output);
-    }
-}
-
-void CToPngDlg::OnExit()
-{
-    this->SendMessage(WM_CLOSE);
-}
-
-void CToPngDlg::OnEncodeDir()
-{
-    CString input, output;
-    if (ShowOpenDirectory(input) && ShowSavePngFile(output)) {
-        this->EncodeDir(input, output);
-    }
-}
-
-void CToPngDlg::UpdateLayout()
-{
-    CRect client;
-    this->GetClientRect(client);
-
-    CRect rtStatus;
-    this->m_textCtrlStatus.GetWindowRect(rtStatus);
-    this->m_textCtrlStatus.MoveWindow(0, (client.Height() - rtStatus.Height()) / 2, client.Width(), rtStatus.Height());
-    this->m_textCtrlStatus.Invalidate();
-}
-
-void CToPngDlg::UpdateStatusText()
-{
-    this->m_strStatus = this->m_bBusy
-        ? _T("加载中...")
-        : _T("拖动文件到窗口以进行编码/解码");
-    this->UpdateData(FALSE);
-}
-
-void CToPngDlg::UpdateEnables()
-{
-    CMenu* menu = this->GetMenu();
-    menu->EnableMenuItem(ID_ENCODE, this->m_bBusy);
-    menu->EnableMenuItem(ID_DECODE, this->m_bBusy);
-    menu->EnableMenuItem(ID_ENCODEDIR, this->m_bBusy);
-}
-
-void CToPngDlg::Busy(BOOL b)
-{
-    this->m_bBusy = b;
-    this->SendMessage(WM_BUSYCNANGED);
-}
-
-LRESULT CToPngDlg::OnBusyChanged(WPARAM wParam, LPARAM lParam)
-{
-    this->UpdateStatusText();
-    this->UpdateEnables();
-    return 0;
-}
-
-LRESULT CToPngDlg::OnEncodeDone(WPARAM wParam, LPARAM lParam)
-{
-    if (wParam) {
-        ::AfxMessageBox(_T("编码完成"), MB_OK | MB_ICONINFORMATION);
-    }
-    else {
-        ::AfxMessageBox(this->m_strErrMsg, MB_OK | MB_ICONERROR);
-    }
-    return 0;
-}
-
-LRESULT CToPngDlg::OnDecodeDone(WPARAM wParam, LPARAM lParam)
-{
-    if (wParam) {
-        ::AfxMessageBox(_T("解码完成"), MB_OK | MB_ICONINFORMATION);
-    }
-    else {
-        ::AfxMessageBox(this->m_strErrMsg, MB_OK | MB_ICONERROR);
-    }
-    return 0;
-}
-
-BOOL CToPngDlg::ShowOpenFile(CString& refFileName)
-{
-    TCHAR szFilter[] = _T("所有文件(*.*)|*.*||");
-    CFileDialog fileDlg(TRUE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
-
-    if (fileDlg.DoModal() == IDOK) {
-        refFileName = fileDlg.GetPathName();
-        return TRUE;
-    }
-    return FALSE;
-}
-
-BOOL CToPngDlg::ShowSavePngFile(CString& refFileName)
-{
-    TCHAR szFilter[] = _T("PNG文件(*.png)|*.png||");
-    CFileDialog fileDlg(FALSE, _T("png"), NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
-
-    if (fileDlg.DoModal() == IDOK) {
-        refFileName = fileDlg.GetPathName();
-        return TRUE;
-    }
-    return FALSE;
-}
-
-BOOL CToPngDlg::ShowOpenPngFile(CString& refFileName)
-{
-    TCHAR szFilter[] = _T("PNG文件(*.png)|*.png|所有文件(*.*)|*.*||");
-    CFileDialog fileDlg(TRUE, _T("png"), NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
-
-    if (fileDlg.DoModal() == IDOK) {
-        refFileName = fileDlg.GetPathName();
-        return TRUE;
-    }
-    return FALSE;
-}
-
-BOOL CToPngDlg::ShowSaveFile(CString& refFileName)
-{
-    TCHAR szFilter[] = _T("所有文件(*.*)|*.*||");
-    CFileDialog fileDlg(FALSE, NULL, NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, szFilter, this);
-
-    if (fileDlg.DoModal() == IDOK) {
-        refFileName = fileDlg.GetPathName();
-        return TRUE;
-    }
-    return FALSE;
-}
-
-BOOL CToPngDlg::ShowOpenDirectory(CString& refDirectory)
-{
-    CFolderPickerDialog dlg;
-
-    if (dlg.DoModal() == IDOK) {
-        refDirectory = dlg.GetFolderPath();
-        return TRUE;
-    }
-    return FALSE;
-}
-
-void CToPngDlg::Encode(const CString& input, const CString& output)
-{
     std::thread(
         [=]() {
-            USES_CONVERSION;
-            this->Busy(TRUE);
+            SetLoadingState(true);
 
             bool ok = true;
             try {
-                Utils::WriteFileToPng(T2A(input), T2A(output));
+                MyUtils::ArchiveDirectoryToPng(
+                    sw::Utils::ToMultiByteStr(input),
+                    sw::Utils::ToMultiByteStr(output));
             }
             catch (const std::exception& e) {
                 ok = false;
-                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
+                errMsg = sw::Utils::ToWideStr(e.what(), true);
             }
 
-            this->Busy(FALSE);
-            this->SendMessage(WM_ENCODEDONE, ok);
+            SetLoadingState(false);
+            SendMessageW(WM_ENCODEDONE, ok, 0);
         }).detach();
 }
 
-void CToPngDlg::Decode(const CString& input, const CString& output)
+bool ToPngDlg::ShowOpenFile(std::wstring& refFileName)
 {
-    std::thread(
-        [=]() {
-            USES_CONVERSION;
-            this->Busy(TRUE);
+    sw::OpenFileDialog ofd;
+    ofd.Filter->AddFilter(L"所有文件(*.*)", L"*.*");
 
-            bool ok = true;
-            try {
-                Utils::ExtractFileFromPng(T2A(input), T2A(output));
-            }
-            catch (const std::exception& e) {
-                ok = false;
-                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
-            }
-
-            this->Busy(FALSE);
-            this->SendMessage(WM_DECODEDONE, ok);
-        }).detach();
+    if (ofd.ShowDialog()) {
+        refFileName = ofd.FileName;
+        return true;
+    }
+    return false;
 }
 
-void CToPngDlg::EncodeDir(const CString& input, const CString& output)
+bool ToPngDlg::ShowSavePngFile(std::wstring& refFileName)
 {
-    std::thread(
-        [=]() {
-            USES_CONVERSION;
-            this->Busy(TRUE);
+    sw::SaveFileDialog sfd;
+    sfd.Filter->AddFilter(L"PNG文件(*.png)", L"*.png", L".png");
+    sfd.Filter->AddFilter(L"所有文件(*.*)", L"*.*");
 
-            bool ok = true;
-            try {
-                Utils::ArchiveDirectoryToPng(T2A(input), T2A(output));
-            }
-            catch (const std::exception& e) {
-                ok = false;
-                this->m_strErrMsg = Utils::Utf8ToCString(e.what());
-            }
+    if (sfd.ShowDialog()) {
+        refFileName = sfd.FileName;
+        return true;
+    }
+    return false;
+}
 
-            this->Busy(FALSE);
-            this->SendMessage(WM_ENCODEDONE, ok);
-        }).detach();
+bool ToPngDlg::ShowOpenPngFile(std::wstring& refFileName)
+{
+    sw::OpenFileDialog ofd;
+    ofd.Filter->AddFilter(L"PNG文件(*.png)", L"*.png");
+
+    if (ofd.ShowDialog()) {
+        refFileName = ofd.FileName;
+        return true;
+    }
+    return false;
+}
+
+bool ToPngDlg::ShowSaveFile(std::wstring& refFileName)
+{
+    sw::SaveFileDialog sfd;
+    sfd.Filter->AddFilter(L"所有文件(*.*)", L"*.*");
+
+    if (sfd.ShowDialog()) {
+        refFileName = sfd.FileName;
+        return true;
+    }
+    return false;
+}
+
+bool ToPngDlg::ShowOpenDirectory(std::wstring& refDirectory)
+{
+    sw::FolderBrowserDialog fbd;
+
+    if (fbd.ShowDialog()) {
+        refDirectory = fbd.SelectedPath;
+        return true;
+    }
+    return false;
+}
+
+bool ToPngDlg::StrEndsWithIgnoreCase(const std::wstring& str, const std::wstring& suffix)
+{
+    if (str.size() < suffix.size()) {
+        return false;
+    }
+
+    std::wstring strEnd = str.substr(str.size() - suffix.size());
+
+    for (size_t i = 0; i < strEnd.size(); ++i) {
+        if (towlower(strEnd[i]) != towlower(suffix[i])) {
+            return false;
+        }
+    }
+    return true;
 }

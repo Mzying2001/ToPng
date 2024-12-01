@@ -1,17 +1,17 @@
-﻿#include "pch.h"
-#include "Utils.h"
+#include "MyUtils.h"
 #include <cmath>
 #include <fstream>
 #include <random>
+#include <Windows.h>
 
-#include "miniz/miniz.h"
-#include "stb/stb_image.h"
-#include "stb/stb_image_write.h"
+#include "miniz.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 
 // 添加文件到zip
 static void _AddFileToZip(mz_zip_archive& zip, const std::string& filePath, const std::string& relativePath) {
-    std::vector<uint8_t> fileData = Utils::ReadFile(filePath);
+    std::vector<uint8_t> fileData = MyUtils::ReadFile(filePath);
     if (!mz_zip_writer_add_mem(&zip, relativePath.c_str(), fileData.data(), fileData.size(), MZ_BEST_COMPRESSION)) {
         throw std::runtime_error("添加文件到ZIP失败：" + relativePath);
     }
@@ -73,51 +73,15 @@ static void _WriteDataToPng(std::vector<uint8_t>& data, const std::string& pngFi
         data[i] = u(e);
     }
 
-    Utils::XorData(&data[0], 0xaa, data.size());
+    MyUtils::XorData(&data[0], 0xaa, data.size());
     int ok = stbi_write_png(pngFileName.c_str(), width, width, 3, &data[0], width * 3);
     if (ok == 0) {
         throw std::runtime_error("写入png文件失败");
     }
 }
 
-// 将 UTF-8 std::string 转换为 CString
-CString Utils::Utf8ToCString(const std::string& str)
-{
-#ifdef UNICODE
-    int utf16Length = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
-    if (utf16Length <= 0) {
-        return CString();
-    }
-
-    CString result;
-    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, result.GetBuffer(utf16Length), utf16Length);
-    result.ReleaseBuffer();
-    return result;
-#else
-    return CString(str.c_str());
-#endif
-}
-
-// 将 CString 转换为 UTF-8 std::string
-std::string Utils::CStringToUtf8(const CString& str)
-{
-#ifdef UNICODE
-    int utf8Length = WideCharToMultiByte(CP_UTF8, 0, str, -1, nullptr, 0, nullptr, nullptr);
-    if (utf8Length <= 0) {
-        return std::string();
-    }
-
-    std::string utf8String(utf8Length, '\0');
-    WideCharToMultiByte(CP_UTF8, 0, str, -1, &utf8String[0], utf8Length, nullptr, nullptr);
-    utf8String.resize(strlen(utf8String.c_str()));
-    return utf8String;
-#else
-    return std::string(CT2A(str));
-#endif
-}
-
 // 读文件
-std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
+std::vector<uint8_t> MyUtils::ReadFile(const std::string& fileName)
 {
     std::ifstream ifs;
     ifs.open(fileName.c_str(), std::ios_base::in | std::ios_base::binary);
@@ -143,7 +107,7 @@ std::vector<uint8_t> Utils::ReadFile(const std::string& fileName)
 }
 
 // 写文件
-void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
+void MyUtils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 {
     if (data == nullptr) {
         throw std::runtime_error("参数data不能为nullptr");
@@ -165,14 +129,14 @@ void Utils::WriteFile(const std::string& fileName, uint8_t* data, size_t size)
 }
 
 // 写入文件到png图像
-void Utils::WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName)
+void MyUtils::WriteFileToPng(const std::string& inputFileName, const std::string& pngFileName)
 {
-    std::vector<uint8_t> data = Utils::ReadFile(inputFileName);
+    std::vector<uint8_t> data = MyUtils::ReadFile(inputFileName);
     _WriteDataToPng(data, pngFileName);
 }
 
 // 从png图像中提取文件
-void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string& outputFileName)
+void MyUtils::ExtractFileFromPng(const std::string& pngFileName, const std::string& outputFileName)
 {
     int w, h, channels;
     uint8_t* rgb = stbi_load(pngFileName.c_str(), &w, &h, &channels, 3);
@@ -182,14 +146,14 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
     }
 
     try {
-        Utils::XorData(rgb, 0xaa, static_cast<size_t>(w) * h * 3);
+        MyUtils::XorData(rgb, 0xaa, static_cast<size_t>(w) * h * 3);
         uint64_t size = *reinterpret_cast<uint64_t*>(rgb);
 
         if (size + sizeof(uint64_t) > static_cast<size_t>(w) * h * 3) {
             throw std::runtime_error("数据格式错误");
         }
 
-        Utils::WriteFile(outputFileName, rgb + sizeof(uint64_t), size);
+        MyUtils::WriteFile(outputFileName, rgb + sizeof(uint64_t), size);
         stbi_image_free(rgb);
     }
     catch (const std::runtime_error&) {
@@ -199,13 +163,13 @@ void Utils::ExtractFileFromPng(const std::string& pngFileName, const std::string
 }
 
 // 对数据进行异或运算
-void Utils::XorData(uint8_t* data, uint8_t x, size_t size)
+void MyUtils::XorData(uint8_t* data, uint8_t x, size_t size)
 {
     for (size_t i = 0; i < size; ++i) { data[i] ^= x; }
 }
 
 // 打包文件夹（zip）
-std::vector<uint8_t> Utils::ArchiveDirectory(const std::string& dir)
+std::vector<uint8_t> MyUtils::ArchiveDirectory(const std::string& dir)
 {
     mz_zip_archive zip;
     memset(&zip, 0, sizeof(zip));
@@ -237,8 +201,8 @@ std::vector<uint8_t> Utils::ArchiveDirectory(const std::string& dir)
 }
 
 // 用zip打包文件夹并写入png图像
-void Utils::ArchiveDirectoryToPng(const std::string& dir, const std::string& pngFileName)
+void MyUtils::ArchiveDirectoryToPng(const std::string& dir, const std::string& pngFileName)
 {
-    std::vector<uint8_t> data = Utils::ArchiveDirectory(dir);
+    std::vector<uint8_t> data = MyUtils::ArchiveDirectory(dir);
     _WriteDataToPng(data, pngFileName);
 }

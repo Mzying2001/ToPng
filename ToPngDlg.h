@@ -1,63 +1,68 @@
-﻿
-// ToPngDlg.h: 头文件
-//
+#ifndef _TOPNGDLG_H_
+#define _TOPNGDLG_H_
 
-#pragma once
+#include "SimpleWindow.h"
 
+// 菜单id
+enum {
+    MENUITEM_ENCODE = 100, // 编码
+    MENUITEM_DECODE,       // 解码
+    MENUITEM_ENCODEDIR,    // 打包文件夹并编码
+    MENUITEM_EXIT,         // 退出
+};
 
-#define WM_BUSYCNANGED (WM_USER+100) // Busy状态改变
-#define WM_ENCODEDONE  (WM_USER+101) // 编码完成
-#define WM_DECODEDONE  (WM_USER+102) // 解码完成
+// 自定义消息
+enum {
+    WM_ENCODEDONE = WM_USER, // 编码完成
+    WM_DECODEDONE,           // 解码完成
+    WM_ISLOADINGCHANGED,     // 加载状态改变
+};
 
-
-// CToPngDlg 对话框
-class CToPngDlg : public CDialog
+// 对话框
+class ToPngDlg : public sw::Window
 {
-    // 构造
-public:
-    CToPngDlg(CWnd* pParent = nullptr); // 标准构造函数
+private:
+    // 是否加载中
+    bool isLoading = false;
 
-    // 对话框数据
-#ifdef AFX_DESIGN_TIME
-    enum { IDD = IDD_TOPNG_DIALOG };
-#endif
+    // 错误信息
+    std::wstring errMsg;
 
-protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
+    // 显示状态信息的Label
+    sw::Label labelStatus;
 
-
-    // 实现
-protected:
-    HICON m_hIcon;
-    CStatic m_textCtrlStatus;
-    CString m_strStatus;
-    BOOL m_bBusy;
-
-    // 生成的消息映射函数
-    DECLARE_MESSAGE_MAP()
-    virtual BOOL OnInitDialog();
-    virtual void OnOK();
-    virtual void OnCancel();
-    afx_msg void OnPaint();
-    afx_msg HCURSOR OnQueryDragIcon();
-    afx_msg LRESULT OnBusyChanged(WPARAM wParam = 0, LPARAM lParam = 0);
-    afx_msg LRESULT OnEncodeDone(WPARAM wParam, LPARAM lParam = 0);
-    afx_msg LRESULT OnDecodeDone(WPARAM wParam, LPARAM lParam = 0);
+    // 菜单
+    sw::Menu menu
+    {
+        sw::MenuItem(L"文件",
+        {
+            sw::MenuItem(MENUITEM_ENCODE, L"编码", *this, &ToPngDlg::MenuCommandHandler),
+            sw::MenuItem(MENUITEM_DECODE, L"解码", *this, &ToPngDlg::MenuCommandHandler),
+            sw::MenuItem(L"-"),
+            sw::MenuItem(MENUITEM_ENCODEDIR, L"打包文件并编码（zip）", *this, &ToPngDlg::MenuCommandHandler),
+            sw::MenuItem(L"-"),
+            sw::MenuItem(MENUITEM_EXIT, L"退出", *this, &ToPngDlg::MenuCommandHandler),
+        })
+    };
 
 public:
-    CString m_strErrMsg; // 储存错误信息
+    // 构造函数
+    ToPngDlg();
 
-    afx_msg void OnClose();
-    afx_msg void OnSize(UINT nType, int cx, int cy);
-    afx_msg void OnDropFiles(HDROP hDropInfo);
-    afx_msg void OnEncode();
-    afx_msg void OnDecode();
-    afx_msg void OnExit();
-    afx_msg void OnEncodeDir();
+    // 初始化控件
+    void InitializeComponent();
 
-public:
-    // 更新布局
-    void UpdateLayout();
+    // 重写WndProc
+    virtual LRESULT WndProc(const sw::ProcMsg& refMsg) override;
+
+    // 窗口关闭处理函数
+    void WindowClosingHandler(sw::UIElement& sender, sw::WindowClosingEventArgs& e);
+
+    // 文件拖放事件处理函数
+    void DropFilesHandler(sw::UIElement& sender, sw::DropFilesEventArgs& e);
+
+    // 菜单时间处理函数
+    void MenuCommandHandler(sw::MenuItem& menuItem);
 
     // 更新状态文本
     void UpdateStatusText();
@@ -65,30 +70,41 @@ public:
     // 更新菜单项Enable
     void UpdateEnables();
 
-    // 设置Busy状态
-    void Busy(BOOL b);
+    // 设置加载状态
+    void SetLoadingState(bool isLoading);
 
-    // 显示打开文件对话框
-    BOOL ShowOpenFile(CString& refFileName);
+    // 编码完成
+    void OnEncodeDone(bool success);
 
-    // 显示保存png文件对话框
-    BOOL ShowSavePngFile(CString& refFileName);
-
-    // 显示打开png文件对话框
-    BOOL ShowOpenPngFile(CString& refFileName);
-
-    // 显示保存文件对话框
-    BOOL ShowSaveFile(CString& refFileName);
-
-    // 显示打开文件夹对话框
-    BOOL ShowOpenDirectory(CString& refDirectory);
+    // 解码完成
+    void OnDecodeDone(bool success);
 
     // 编码
-    void Encode(const CString& input, const CString& output);
+    void Encode(const std::wstring& input, const std::wstring& output);
 
     // 解码
-    void Decode(const CString& input, const CString& output);
+    void Decode(const std::wstring& input, const std::wstring& output);
 
-    // 打包文件夹并编码（zip）
-    void EncodeDir(const CString& input, const CString& output);
+    // 编码文件夹
+    void EncodeDir(const std::wstring& input, const std::wstring& output);
+
+    // 显示打开文件对话框
+    bool ShowOpenFile(std::wstring& refFileName);
+
+    // 显示保存png文件对话框
+    bool ShowSavePngFile(std::wstring& refFileName);
+
+    // 显示打开png文件对话框
+    bool ShowOpenPngFile(std::wstring& refFileName);
+
+    // 显示保存文件对话框
+    bool ShowSaveFile(std::wstring& refFileName);
+
+    // 显示打开文件夹对话框
+    bool ShowOpenDirectory(std::wstring& refDirectory);
+
+    // 判断字符串是否以指定字串结尾，忽略大小写
+    bool StrEndsWithIgnoreCase(const std::wstring& str, const std::wstring& suffix);
 };
+
+#endif // !_TOPNGDLG_H_
