@@ -15,8 +15,8 @@ ToPngDlg::ToPngDlg()
     InitializeComponent();
 
     AcceptFiles = true;
-    RegisterRoutedEvent<sw::DropFilesEventArgs>(*this, &ToPngDlg::DropFilesHandler);
-    RegisterRoutedEvent<sw::WindowClosingEventArgs>(*this, &ToPngDlg::WindowClosingHandler);
+    AddHandler<sw::DropFilesEventArgs>(*this, &ToPngDlg::DropFilesHandler);
+    AddHandler<sw::WindowClosingEventArgs>(*this, &ToPngDlg::WindowClosingHandler);
 }
 
 void ToPngDlg::InitializeComponent()
@@ -26,29 +26,6 @@ void ToPngDlg::InitializeComponent()
     labelStatus.SetAlignment(sw::HorizontalAlignment::Center, sw::VerticalAlignment::Center);
     UpdateStatusText();
     AddChild(labelStatus);
-}
-
-LRESULT ToPngDlg::WndProc(const sw::ProcMsg& refMsg)
-{
-    switch (refMsg.uMsg)
-    {
-    case WM_ENCODEDONE: {
-        OnEncodeDone(refMsg.wParam);
-        return 0;
-    }
-    case WM_DECODEDONE: {
-        OnDecodeDone(refMsg.wParam);
-        return 0;
-    }
-    case WM_ISLOADINGCHANGED: {
-        UpdateStatusText();
-        UpdateEnables();
-        return 0;
-    }
-    default: {
-        return sw::Window::WndProc(refMsg);
-    }
-    }
 }
 
 void ToPngDlg::WindowClosingHandler(sw::UIElement& sender, sw::WindowClosingEventArgs& e)
@@ -144,8 +121,12 @@ void ToPngDlg::UpdateEnables()
 
 void ToPngDlg::SetLoadingState(bool isLoading)
 {
-    this->isLoading = isLoading;
-    SendMessageW(WM_ISLOADINGCHANGED, 0, 0);
+    Invoke(
+        [=]() {
+            this->isLoading = isLoading;
+            UpdateStatusText();
+            UpdateEnables();
+        });
 }
 
 void ToPngDlg::OnEncodeDone(bool success)
@@ -190,7 +171,7 @@ void ToPngDlg::Encode(const std::wstring& input, const std::wstring& output)
             }
 
             SetLoadingState(false);
-            SendMessageW(WM_ENCODEDONE, ok, 0);
+            Invoke([this, ok]() { OnEncodeDone(ok); });
         }).detach();
 }
 
@@ -216,7 +197,7 @@ void ToPngDlg::Decode(const std::wstring& input, const std::wstring& output)
             }
 
             SetLoadingState(false);
-            SendMessageW(WM_DECODEDONE, ok, 0);
+            Invoke([this, ok]() { OnDecodeDone(ok); });
         }).detach();
 }
 
@@ -242,7 +223,7 @@ void ToPngDlg::EncodeDir(const std::wstring& input, const std::wstring& output)
             }
 
             SetLoadingState(false);
-            SendMessageW(WM_ENCODEDONE, ok, 0);
+            Invoke([this, ok]() { OnEncodeDone(ok); });
         }).detach();
 }
 

@@ -11,13 +11,6 @@ enum {
     MENUITEM_EXIT,         // 退出
 };
 
-// 自定义消息
-enum {
-    WM_ENCODEDONE = WM_USER, // 编码完成
-    WM_DECODEDONE,           // 解码完成
-    WM_ISLOADINGCHANGED,     // 加载状态改变
-};
-
 // 对话框
 class ToPngDlg : public sw::Window
 {
@@ -51,9 +44,6 @@ public:
 
     // 初始化控件
     void InitializeComponent();
-
-    // 重写WndProc
-    virtual LRESULT WndProc(const sw::ProcMsg& refMsg) override;
 
     // 窗口关闭处理函数
     void WindowClosingHandler(sw::UIElement& sender, sw::WindowClosingEventArgs& e);
