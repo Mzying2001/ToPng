@@ -7,6 +7,5 @@ int APIENTRY wWinMain(
     _In_     INT       nCmdShow)
 {
     auto dlg = std::make_unique<ToPngDlg>();
-    dlg->Show();
-    return sw::App::MsgLoop();
+    return dlg->ShowDialog();
 }
